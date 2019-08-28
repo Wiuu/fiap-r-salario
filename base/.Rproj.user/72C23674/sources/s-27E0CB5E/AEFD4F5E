@@ -1,0 +1,23 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1567032142815.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3943770886",
+    "id" : "AEFD4F5E",
+    "lastKnownWriteTime" : 1567032084,
+    "last_content_update" : 1567032084,
+    "path" : "C:/Users/logonrmlocal/wiuu/fiap-estatistica-master/estatistica_vinhos.Rmd",
+    "project_path" : "estatistica_vinhos.Rmd",
+    "properties" : {
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
