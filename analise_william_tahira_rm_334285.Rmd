@@ -29,7 +29,231 @@ library(rpart.plot)
 library(polycor)
 library(cluster)
 library(fpc)
+library(readxl)
 ```
 ******
 # Introdução
 ******
+
+Esta analise visa utilizar o dataset disponivel e mensurar a variavel salarios com base em algumas variaveis, como: sexo, idade, tamanho da empresa e outros.
+
+******
+# Carregando os dados
+******
+
+```{r load data}
+salarios <- read_excel(path = './salario_1.xlsx', sheet = 1);
+salarios$sexo <- as.numeric(factor(salarios$sexo));
+```
+
+******
+# Sumario da base
+******
+```{r load data}
+summary(salarios)
+str(salarios, stringsAsFactors = TRUE)
+```
+
+Dataset com 6 variaveis, dentre elas a variável "salario" indica o valor de salario por cada funcionário
+ - **salario:** Indica o valor recebido de salario
+ - **sexo:** Indica o genero masculino feminino
+ - **tempoempresa:** Indica o tempo de empresa de cada funcionário;
+ - **idade:** Indica a idade de cada funcionário;
+ - **escolaridade:** Indica o grau de escolaridade de cada funcionário;
+ - **experiencia:** Indica o grau de experiência de cada funcionário;
+
+******
+## Verificando a amostra
+******
+
+Analisando a consistencia da amostra em relação a dados incompletos ou faltantes:
+```{r results='asis'}
+skim(salarios) %>% skimr::kable()
+```
+
+******
+## Detectando Outliers
+******
+
+Outliers são observações que apresentam uma grande diferenciação ou inconsistencias em relação aos demais. Para isso usamos analise graficas com sobreposição de histograma x distribuição normal e delimitacão de linha de corte com boxplot.
+
+```{r}
+hist.default <- function(x,
+                         breaks = "Sturges",
+                         freq = NULL,
+                         include.lowest = TRUE,
+                         normalcurve = TRUE,
+                         right = TRUE,
+                         density = NULL,
+                         angle = 45,
+                         col = NULL,
+                         border = NULL,
+                         main = paste("Histogram of", xname),
+                         ylim = NULL,
+                         xlab = xname,
+                         ylab = NULL,
+                         axes = TRUE,
+                         plot = TRUE,
+                         labels = FALSE,
+                         warn.unused = TRUE,
+                         ...)  {
+  xname <- paste(deparse(substitute(x), 500), collapse = "\n")
+
+  suppressWarnings(
+    h <- graphics::hist.default(
+      x = x,
+      breaks = breaks,
+      freq = freq,
+      include.lowest = include.lowest,
+      right = right,
+      density = density,
+      angle = angle,
+      col = col,
+      border = border,
+      main = main,
+      ylim = ylim,
+      xlab = xlab,
+      ylab = ylab,
+      axes = axes,
+      plot = plot,
+      labels = labels,
+      warn.unused = warn.unused,
+      ...
+    )
+  )
+
+  if (normalcurve == TRUE & plot == TRUE) {
+    x <- x[!is.na(x)]
+    xfit <- seq(min(x), max(x), length = 40)
+    yfit <- dnorm(xfit, mean = mean(x), sd = sd(x))
+    if (isTRUE(freq) | (is.null(freq) & is.null(density))) {
+      yfit <- yfit * diff(h$mids[1:2]) * length(x)
+    }
+    lines(xfit, yfit, col = "black", lwd = 2)
+  }
+
+  if (plot == TRUE) {
+    invisible(h)
+  } else {
+    h
+  }
+}
+
+plotaGraficos <- function(fsalario, label){
+par(mfrow = c(1,2))
+hist(fsalario, main = paste("Histograma de ",label), xlab = label, ylab="Frequência")
+abline(v = mean(fsalario) - 2 * sd(fsalario), col = "red")
+abline(v = mean(fsalario) + 2 * sd(fsalario), col = "red")
+boxplot(fsalario)
+}
+
+plotaGraficos(salarios$salario, "salario")
+plotaGraficos(salarios$sexo, "sexo")
+plotaGraficos(salarios$tempoempresa, "tempoempresa")
+plotaGraficos(salarios$idade, "idade")
+plotaGraficos(salarios$escolaridade, "escolaridade")
+plotaGraficos(salarios$experiencia, "experiencia")
+```
+
+## Removendo Outliers
+Pelo boxplot é possível visualizar que há grupos distintos de salários, mas também é possível notar que neste, existem observações com valores muito distantes dos agrupamentos no gráfico e consideramos estas possíveis outliers, sendo assim, serão removidos para que não interfiram no resultado da análise e dos algoritmos
+```{r}
+salarios <- salarios%>%filter(salario < 26000)
+plotaGraficos(salarios$salario, "salario")
+```
+******
+# Correlação de variaveis
+******
+
+Gerando a correlação das variaveis, vai permitir o entendimento de quais carácteristicas influenciam mais no valor do salário recebido.
+
+Vamos começar pela matriz de correlação.
+
+## Matriz de Correlação
+
+ Matriz de correlação mostra os valores de correlação de Pearson, que medem o grau de relação linear entre cada par de itens ou variáveis. Os valores de correlação podem cair entre -1 e +1.
+```{r}
+matcor <- cor(salarios%>%select(2:7))
+panel.cor <- function(x, y, digits=2, prefix ="", cex.cor,
+                      ...)  {
+  usr <- par("usr")
+  on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- cor(x, y , use = "pairwise.complete.obs")
+  txt <- format(c(r, 0.123456789), digits = digits) [1]
+  txt <- paste(prefix, txt, sep = "")
+  if (missing(cex.cor))
+    cex <- 0.8/strwidth(txt)
+  text(0.5, 0.5, txt, cex = cex * abs(r))
+}
+pairs(salarios%>%select(2:7), lower.panel=panel.smooth, upper.panel=panel.cor)
+```
+### Conclusão
+
+O Valor de um salário neste estudo, apresenta correlação com a experiência, tempo de casa e escolaridade.
+
+## Estimando o salário
+Tendo como alvo o salario, usaremos os dados aqui presentes para levantarmos e estimarmos um salário usando 2 técnicas.
+
+### Regressão Linear
+A regressão linear consiste em uma função que relaciona as variáveis que contém características do objeto de estudo a uma varíavel depente do mesmo objeto de estudo, gerando assim uma relação entre o resultado observado às suas possíveis explicações.
+
+Usaremos o método stepwise no desenvolvimento do modelo, selecionando assim as variáveis que melhor estimem o valor do salário.
+
+```{r, message=FALSE, warning=FALSE}
+salarios_rl <- salarios%>%select(2:7)
+modelo_rl <- lm(salarios_rl$salario ~ salarios_rl$sexo + salarios_rl$tempoempresa + salarios_rl$idade + salarios_rl$escolaridade + salarios_rl$experiencia);
+stepwise<-step(modelo_rl,direction="both")
+summary(stepwise)
+
+```
+Através da sumarização do modelo podemos observar que experiência, escolaridade e tempo de casa têm grande influencia em um salário, idade e sexo nem tanto.
+
+******
+#### Análise de resíduos
+
+******
+Com o gráfico abaixo podemos concluir que os resíduos da predição com o modelo desenvolvido que a premissa de normalidade é atendida:
+```{r}
+qqnorm(residuals(modelo_rl), ylab="Resíduos",xlab="Quantis teóricos",main="")
+qqline(residuals(modelo_rl))
+```
+Concluímos que com o modelo de regressão desenvolvido temos um erro quadrático médio de aproximadamente 2737.
+```{r}
+pred <- predict(modelo_rl,interval = "prediction", level = 0.95) 
+fit <- pred[,1]
+mse <- mean((salarios_rl$salario  - fit)^2)
+sqrt(mse)
+```
+
+### Árvore de Regressão
+Árvores de Regressão são idênticas às árvores de decisão porém para variáveis escalares, na figura abaixo está a plotagem de uma árvore de regressão de 9 níveis na qual as folhas agrupam os funcionarios por salario, o split do algoritmo foi setado em 325 que é aproximadamente o valor de 5% da amostra. Com este algorimo atingimos um erro quadrático médio de aproximadamente 0,71.
+```{r}
+modelo_arvore <- rpart(salario ~ sexo + tempoempresa + idade + escolaridade + experiencia, data=salarios_rl, 
+                     cp = 0.001,minsplit = 50,maxdepth=20)
+
+rpart.plot(modelo_arvore, type=4, extra=1, under=FALSE, clip.right.labs=TRUE,
+           fallen.leaves=FALSE,   digits=2, varlen=-10, faclen=20,
+           cex=0.4, tweak=1.7,
+           compress=TRUE, 
+           snip=FALSE)
+
+pred_arvore <- predict(modelo_arvore,interval = "prediction", level = 0.95) 
+mse_tree <- mean((salarios_rl$salario  - pred_arvore)^2)
+sqrt(mse_tree)
+```
+
+Assim concluímos que entre os dois algoritmos apresentados o de melhor desempenho foi a <b>Árvore de Regressão</b> ainda que com uma diferença muito pequena entre eles.
+
+## Classificando entre bons e ruins
+Tendo em mente que os vinhos com nota superior igual à 6 sãos classificados com bons e os inferiores à isso são classificados como ruins podemos criar uma variável qualitativa e criarmos uma nova variável no dataset e trabalharmos sobre os dados que levam a esta classificação.
+```{r}
+vinhos_class <- vinhos%>%
+                select(2:14)%>%
+                mutate(Qualidade = ifelse(quality >= 6, "BOM", "RUIM"))%>%
+                select(-quality)%>%
+                select(-Vinho)
+vinhos_class$Qualidade <- factor(vinhos_class$Qualidade)
+
+summary(vinhos_class)
+```
