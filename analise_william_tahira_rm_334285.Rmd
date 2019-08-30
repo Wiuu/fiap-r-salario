@@ -41,7 +41,7 @@ Esta analise visa utilizar o dataset disponivel e mensurar a variavel salarios c
 # Carregando os dados
 ******
 
-```{r load data}
+```{r}
 salarios <- read_excel(path = './salario_1.xlsx', sheet = 1);
 salarios$sexo <- factor(salarios$sexo);
 salarios
@@ -50,7 +50,7 @@ salarios
 ******
 # Sumario da base
 ******
-```{r load data}
+```{r}
 summary(salarios)
 str(salarios, stringsAsFactors = TRUE)
 ```
@@ -235,7 +235,7 @@ sqrt(mse)
 
 ### Árvore de Regressão
 Árvores de Regressão são idênticas às árvores de decisão porém para variáveis escalares, na figura abaixo está a plotagem de uma árvore de regressão de 9 níveis na qual as folhas agrupam os funcionarios por salario, o split do algoritmo foi setado em 33 que é aproximadamente o valor de 5% da amostra. Com este algorimo atingimos um erro quadrático médio de aproximadamente 2737.
-```{r}
+```{r, message=FALSE, warning=FALSE}
 modelo_arvore <- rpart(salario ~ sexo + tempoempresa + idade + escolaridade + experiencia, data=salarios_rl, 
                      cp = 0.001,minsplit = 33,maxdepth=20)
 
@@ -277,7 +277,7 @@ plot(salario_class$CATEGORIA_SALARIAL, salario_class$sexo,ylab="sexo",xlab="Cate
 ```
 
 Agora vamos usar o corrplot para enxergarmos as correlações.
-```{r}
+```{r, message=FALSE, warning=FALSE}
 matcor <- hetcor(salario_class)
 panel.cor <- function(x, y, digits=2, prefix ="", cex.cor,
                       ...)  {
@@ -311,7 +311,7 @@ testData  <- salario_class[-treino,]
 #### Árvore de decisão
 Com o intuito de selecionarmos as variáveis que utilizaremos na regressão logística primeiros iremos usar a árvore de decisão para identificarmos quais variáveis se apresentam como critérios de decisão.
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 modelo_arvore_decisao <- rpart (CATEGORIA_SALARIAL ~ sexo + tempoempresa + idade + escolaridade + experiencia, data=trainData, cp = 0.006,minsplit = 33,maxdepth=20)
 rpart.plot(modelo_arvore_decisao, type=4, extra=104, under=FALSE, clip.right.labs=TRUE,
            fallen.leaves=FALSE,   digits=2, varlen=-3, faclen=20,
@@ -334,30 +334,33 @@ Observamos pela matriz de confusão a assertividade do modelo e seu percentual d
 ### Regressão Logística
 Assim como na regressão linear a regressão logística se baseia em váriáveis independentes para chegar a uma variável dependente, porém neste caso, uma variável categórica
 ```{r}
-modelo_log<-glm(Qualidade ~ fixedacidity + volatileacidity + citricacid  + residualsugar + chlorides + freesulfurdioxide + totalsulfurdioxide + density  + pH + sulphates + alcohol,trainData, family=binomial(link=logit))
+modelo_log<-glm(CATEGORIA_SALARIAL ~ sexo + tempoempresa + idade + escolaridade + experiencia,trainData, family=binomial(link=logit))
 
 predito<-fitted(modelo_log)
 hist(predito)
 fx_predito <- cut(predito, breaks=c(0,0.10,0.20,0.30,0.40,0.50,0.60,0.70,0.80,0.90,1), right=F)
-plot(fx_predito , trainData$Qualidade)
+plot(fx_predito , trainData$CATEGORIA_SALARIAL)
 
 Predito_teste<-predict(modelo_log, testData)
 
 fx_predito1 <- cut(Predito_teste, breaks=c(0,0.50,1), right=F)
 
-MC <- table(testData$Qualidade,  fx_predito1 , deparse.level = 2)
+MC <- table(testData$CATEGORIA_SALARIAL,  fx_predito1 , deparse.level = 2)
 show(MC) 
 perc.erro.log = 1 - sum(diag(MC))/sum(MC) 
 show(perc.erro.log )
 ```
-Como podemos ver nos gráficos acima e também na matriz de confusão, o percentual de erro do modelo foi de aproximadamente 47%, o que nos leva a concluir que para a classificação dos vinhos entre BOM e RUIM o melhor método foi a <b>Árvore de decisão</b>.
+Como podemos ver nos gráficos acima e também na matriz de confusão, o percentual de erro do modelo foi de aproximadamente 41%, o que nos leva a concluir que para a classificação dos salários entre ALTO e BAIXO o melhor método foi a <b>Árvore de decisão</b>.
 
-## Definindo grupos de vinhos
-Para análise dos grupos de vinhos a partir de sua características físico-químicas iremos utilizar três técnicas, são elas: Clusteres Hierárquicos, Componentes principais e K-means.
+## Outras Analises
+Para análise salarial até agora usamos as chamadas técnicas supervisionas de análise, uma alternativa neste contexto seria fazer uma <b>ANÁLISE DISCRIMINANTE</b>, temos também um outro tipo de análise chamadas de não supervisionadas que iremos ver mais abaixo usando k-means.
+
+### Técnicas Não supervisionadas
+Para análise dos grupos de salários a partir de sua características iremos utilizar três técnicas, são elas: Clusteres Hierárquicos, Componentes principais e K-means.
 
 ```{r}
-vinhos_clusters <- vinhos%>%select(2:12)
-matcor <- cor(vinhos_clusters)
+salarios_clusters <- salarios%>%select(2:7)
+matcor <- hetcor(salarios_clusters)
 panel.cor <- function(x, y, digits=2, prefix ="", cex.cor,
                       ...)  {
   usr <- par("usr")
@@ -370,30 +373,28 @@ panel.cor <- function(x, y, digits=2, prefix ="", cex.cor,
     cex <- 0.8/strwidth(txt)
   text(0.5, 0.5, txt, cex = cex * abs(r))
 }
-pairs(vinhos_clusters, lower.panel=panel.smooth, upper.panel=panel.cor)
+pairs(salarios_clusters, lower.panel=panel.smooth, upper.panel=panel.cor)
 ```
-Como já observado anteriormente, algumas das variáveis do dataset apresentam forte correlação entre si como freesulfordioxide e totalsulfordioxide, outro exemplo de forte correlação é alcohol e density. 
 
 ### Componentes Principais
 Esta técnica consiste no desenvolvimento de componentes de análise que representem as características dos dados sem que que sofre interferência das variáveis que possuem forte correlação entre elas, possibilitando assim um melhor desempenho dos modelos.
 
 ```{r}
-vinhos_clusters_padr <- scale(vinhos_clusters)
-pcacor_vinhos <- prcomp(vinhos_clusters_padr, scale = TRUE) 
-summary(pcacor_vinhos)
-plot(1:11, pcacor_vinhos$sdev^2, type = "b", xlab = "Componente", ylab = "Variância", pch = 20, cex.axis = 0.8, cex.lab = 0.8)
+salarios_clusters$sexo <- as.numeric(factor(salarios_clusters$sexo));
+salarios_clusters_padr <- scale(salarios_clusters)
+pcacor_salarios <- prcomp(salarios_clusters_padr, scale = TRUE) 
+summary(pcacor_salarios)
+plot(1:6, pcacor_salarios$sdev^2, type = "b", xlab = "Componente", ylab = "Variância", pch = 20, cex.axis = 0.8, cex.lab = 0.8)
 
-pcacor_vinhos$rotation[, 1:11]
-pcacor_vinhos <- prcomp(vinhos_clusters_padr, scale = TRUE, retx = TRUE)
+pcacor_salarios$rotation[, 1:6]
+pcacor_salarios <- prcomp(salarios_clusters_padr, scale = TRUE, retx = TRUE)
 
-CP1 <- pcacor_vinhos$x[, 1]
-CP2 <- pcacor_vinhos$x[, 2]
-CP3 <- pcacor_vinhos$x[, 3]
-CP4 <- pcacor_vinhos$x[, 4]
-CP5 <- pcacor_vinhos$x[, 5]
-CP6 <- pcacor_vinhos$x[, 6]
-CP7 <- pcacor_vinhos$x[, 7]
-CP8 <- pcacor_vinhos$x[, 8]
+CP1 <- pcacor_salarios$x[, 1]
+CP2 <- pcacor_salarios$x[, 2]
+CP3 <- pcacor_salarios$x[, 3]
+CP4 <- pcacor_salarios$x[, 4]
+CP5 <- pcacor_salarios$x[, 5]
+CP6 <- pcacor_salarios$x[, 6]
 
 par (mfrow=c(1,2))
 hist(CP1)
@@ -402,19 +403,17 @@ hist(CP3)
 hist(CP4)
 hist(CP5)
 hist(CP6)
-hist(CP7)
-hist(CP8)
 
-pca_vinhos <-cbind(CP1,CP2,CP3,CP4,CP5,CP6,CP7,CP8)
+pca_salarios <-cbind(CP1,CP2,CP3,CP4,CP5,CP6)
 ```
-Baseado no gráfico de Variãncia x Componente percebos que por volta de 8 componentes principais a variância diminui bastante, e interpretando os componentes percebos que cada um leva em conta com um peso maior seja positivo ou negativo cerca de 2 a 3 características físico-químicas dos vinhos. Adotaremos então os componentes de 1 a 8.
+Baseado no gráfico de Variãncia x Componente percebos que por volta de 6 componentes principais a variância diminui bastante, e interpretando os componentes percebos que cada um leva em conta com um peso maior seja positivo ou negativo cerca de 2 a 3 características influenciadores no salario. Adotaremos então os componentes de 1 a 6.
 
 ### Clusters Hierárquicos
 Assim como o próprio nome diz esta técnica demonstra a hierarquia entre os clusters dentro de um mesmo dataset
 
 ```{r}
-hier_cluster<-hclust(dist(vinhos_clusters_padr),method='ward.D2')
-d <- dist(vinhos_clusters_padr, method = "euclidean") 
+hier_cluster<-hclust(dist(salarios_clusters_padr),method='ward.D2')
+d <- dist(salarios_clusters_padr, method = "euclidean") 
 plot(hier_cluster, ylab='distancia', cex=0.6)
 
 groups <- cutree(hier_cluster, k=10) 
@@ -423,11 +422,11 @@ rect.hclust(hier_cluster, k=10, border="red")
 groups <- cutree(hier_cluster, k=7) 
 rect.hclust(hier_cluster, k=7, border="blue")
 ```
-Nos baseando nas características físico-químicas dos vinhos encontramos 10 clusters distintos, sendo alguns dele muito menores do que os demais e outros bem abrangentes, faz parte da avaliação compararmos os clusters encontrados com os componentes principais e procurarmos semelhanças. Reduzimos então o número de clusters para 7 (em azul) para que possamos obersvar a hierarquia.
+Nos baseando nas características dos salários encontramos 10 clusters distintos, sendo alguns dele muito menores do que os demais e outros bem abrangentes, faz parte da avaliação compararmos os clusters encontrados com os componentes principais e procurarmos semelhanças. Reduzimos então o número de clusters para 7 (em azul) para que possamos obersvar a hierarquia.
 
 ```{r}
-hier_cluster_pca<-hclust(dist(pca_vinhos),method='ward.D2')
-d <- dist(pca_vinhos, method = "euclidean") 
+hier_cluster_pca<-hclust(dist(pca_salarios),method='ward.D2')
+d <- dist(pca_salarios, method = "euclidean") 
 plot(hier_cluster_pca, ylab='distancia', cex=0.6)
 
 groups <- cutree(hier_cluster_pca, k=10) 
@@ -436,14 +435,14 @@ rect.hclust(hier_cluster_pca, k=10, border="red")
 groups <- cutree(hier_cluster_pca, k=7) 
 rect.hclust(hier_cluster_pca, k=7, border="blue")
 ```
-Existe uma diferença entre os clusters encontrados com os componentes principais e podemos inferir que esse diferença se se deve ao motivo dos componentes não sofrem com a alta correlação entre as variáveis. Podemos observar também que a diferença se repete mesmo quando diminuimos a quantidade de clusters, entretanto, quando usamos os componentes principais é perceptível a existência de apenas um grupo muito pequeno o que não ocorre quando nos baseamos nas variáveis explicativas do dataset.
+A diferença entre os clusters sa da pois os componentes sofrem com alta correlação entre as variaveis, essa diferença se mantem, mesmo diminuindo os cluster no grafico acima.
 
 ### K-means
 É uma técnica não hierárquica que consiste na formação de clusters que agrupem observações a partir de um ponto central baseado na distância da observação ao ponto central, ao fim do k-means as observações estarão clusterizadas em torno do centróido ao qual tem a menor distância.
 
 ```{r}
-wss <- (nrow(vinhos_clusters_padr)-1)*sum(apply(vinhos_clusters_padr,2,var))
-for (i in 2:100) wss[i] <- sum(kmeans(vinhos_clusters_padr,
+wss <- (nrow(salarios_clusters_padr)-1)*sum(apply(salarios_clusters_padr,2,var))
+for (i in 2:100) wss[i] <- sum(kmeans(salarios_clusters_padr,
                                      centers=i, iter.max = 50)$withinss)
 plot(1:100, wss, type="b", xlab="Número de clusters") 
 ```
@@ -452,31 +451,33 @@ Analisando o gráfico acima podemos verificar que com cerca 90 clusters teremos 
 
 ```{r}
 set.seed(2019)
-output_cluster<-kmeans(vinhos_clusters_padr,90, iter = 50)
-cluster_vinho<-output_cluster$cluster
+output_cluster<-kmeans(salarios_clusters_padr,90, iter = 50)
+cluster_salario<-output_cluster$cluster
 
-table (cluster_vinho)
+table (cluster_salario)
 
-clusplot(vinhos_clusters_padr, output_cluster$cluster, color=TRUE, shade=TRUE,
+clusplot(salarios_clusters_padr, output_cluster$cluster, color=TRUE, shade=TRUE,
          labels=2, lines=0 , cex=0.75)
 
-plotcluster(vinhos_clusters_padr, output_cluster$cluster) 
+plotcluster(salarios_clusters_padr, output_cluster$cluster) 
 ```
 
 ```{r}
-wss <- (nrow(pca_vinhos)-1)*sum(apply(pca_vinhos,2,var))
-for (i in 2:100) wss[i] <- sum(kmeans(pca_vinhos,
+wss <- (nrow(pca_salarios)-1)*sum(apply(pca_salarios,2,var))
+for (i in 2:100) wss[i] <- sum(kmeans(pca_salarios,
                                      centers=i, iter.max = 50)$withinss)
 plot(1:100, wss, type="b", xlab="Número de clusters") 
 ```
 Podemos observar que executando o k-means com os componentes principais encontramos cerca 80 clusters com tamanhos diferentes dos encontrados anteriormente como podemos ver abaixo.
 ```{r}
 set.seed(2019)
-output_cluster_pca<-kmeans(pca_vinhos,80, iter = 50)
-cluster_vinho_pca<-output_cluster_pca$cluster
+output_cluster_pca<-kmeans(pca_salarios,80, iter = 50)
+cluster_salario_pca<-output_cluster_pca$cluster
 
-table (cluster_vinho_pca)
+table (cluster_salario_pca)
 
-clusplot(pca_vinhos, output_cluster_pca$cluster, color=TRUE, shade=TRUE, labels=2, lines=0 , cex=0.75)
+clusplot(pca_salarios, output_cluster_pca$cluster, color=TRUE, shade=TRUE, labels=2, lines=0 , cex=0.75)
 ```
 Concluímos que utilizando os componentes principais teremos um número menor de clusters porém com características que possibilitam uma melhor visualização desses agrupamentos.
+
+Analisando o gráfico acima podemos verificar que com cerca 90 clusters teremos poucas diferenças entre observações que indiquem a existe de um novo cluster com características muito específicas.
